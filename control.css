@@ -163,3 +163,19 @@
         grid-template-columns: 1fr;
       }
     }
+
+    .obs-banner {
+      margin-top: 18px;
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 10px;
+      font-size: 16px;
+      color: var(--muted);
+    }
+
+    .obs-banner strong { color: var(--text); display: block; margin-bottom: 6px; }
+
+    .obs-banner ol { margin: 0; padding-left: 18px; }
+
+    .obs-banner a { color: var(--accent); word-break: break-all; }

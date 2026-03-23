@@ -37,6 +37,16 @@ app.post("/reset", (req, res) => {
   res.json({ ok: true, state: scoreboardState });
 });
 
+// Serve control UI at root and index.html
+app.get(["/", "/index.html"], (req, res) => {
+  res.sendFile(path.join(__dirname, "control.html"));
+});
+
+// Convenience route to open the overlay directly
+app.get(["/overlay", "/overlay.html"], (req, res) => {
+  res.sendFile(path.join(__dirname, "overlay.html"));
+});
+
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
