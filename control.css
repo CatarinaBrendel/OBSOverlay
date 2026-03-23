@@ -1,0 +1,165 @@
+:root {
+      --bg: #111318;
+      --panel: #1b1f27;
+      --panel-2: #232937;
+      --text: #f5f7fb;
+      --muted: #aeb6c5;
+      --accent: #7c3aed;
+      --danger: #dc2626;
+      --border: rgba(255,255,255,0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      padding: 20px;
+    }
+
+    .wrap {
+      max-width: 900px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+    }
+
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 28px;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+    }
+
+    /* allow a field to span both columns in the .grid */
+    .grid .field.full {
+      grid-column: 1 / -1;
+    }
+
+
+    .field.footer-field input {
+      font-weight: 800;
+      font-size: 18px;
+      padding: 14px 16px;
+      text-align: center;
+    }
+
+    label {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 18px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+    }
+
+    .score-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 6px;
+    }
+
+    .score-box {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .score-box h2 {
+      margin: 0 0 14px 0;
+      font-size: 20px;
+    }
+
+    .score-value {
+      font-size: 58px;
+      font-weight: 900;
+      text-align: center;
+      margin: 8px 0 16px;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      background: var(--accent);
+      color: white;
+    }
+
+    button.secondary {
+      background: #374151;
+    }
+
+    button.danger {
+      background: var(--danger);
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .hint {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 760px) {
+      .grid,
+      .score-row,
+      .actions {
+        grid-template-columns: 1fr;
+      }
+    }

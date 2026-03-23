@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scoreboard Control</title>
+  <link rel="stylesheet" href="control.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <h1>Scoreboard Control</h1>
+      <p>Edit names, score, round text, and footer. The OBS overlay updates automatically.</p>
+    </div>
+
+    <div class="panel">
+      <div class="grid">
+        <div class="field">
+          <label for="leftName">Left player</label>
+          <input id="leftName" type="text" />
+        </div>
+
+        <div class="field">
+          <label for="rightName">Right player</label>
+          <input id="rightName" type="text" />
+        </div>
+
+        <div class="field full">
+          <label for="roundText">Round / phase</label>
+          <input id="roundText" type="text" />
+        </div>
+
+        <div class="field footer-field">
+          <label for="footerLeft">Footer left</label>
+          <input id="footerLeft" type="text" inputmode="text" autocapitalize="words" spellcheck="true" placeholder="e.g. 2nd Tournament" />
+        </div>
+
+        <div class="field footer-field">
+          <label for="footerRight">Footer right</label>
+          <input id="footerRight" type="text" inputmode="text" autocapitalize="words" spellcheck="true" placeholder="e.g. #StillFantastic" />
+        </div>
+      </div>
+    </div>
+
+    <div class="score-row">
+      <div class="score-box">
+        <h2>Left score</h2>
+        <div class="score-value" id="leftScoreDisplay">0</div>
+        <div class="button-grid">
+          <button type="button" onclick="changeScore('left', 1)">+1</button>
+          <button type="button" class="secondary" onclick="changeScore('left', -1)">-1</button>
+        </div>
+      </div>
+
+      <div class="score-box">
+        <h2>Right score</h2>
+        <div class="score-value" id="rightScoreDisplay">0</div>
+        <div class="button-grid">
+          <button type="button" onclick="changeScore('right', 1)">+1</button>
+          <button type="button" class="secondary" onclick="changeScore('right', -1)">-1</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="actions">
+        <button type="button" class="secondary" onclick="swapPlayers()">Swap players</button>
+        <button type="button" class="secondary" onclick="resetScores()">Reset scores</button>
+        <button type="button" class="danger" onclick="resetAll()">Reset all</button>
+      </div>
+      <div class="hint">
+        Optional hotkeys while this page is focused: A = +1 left, L = +1 right, R = reset scores, S = swap players.
+      </div>
+    </div>
+  </div>
+
+  <script src="control.js"></script>
+</body>
+</html>

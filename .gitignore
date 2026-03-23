@@ -1,0 +1,37 @@
+# Node modules
+node_modules/
+
+# Environment files
+.env
+.env.*
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Build output
+dist/
+build/
+coverage/
+
+# Next/Vercel caches
+.next/
+.vercel/
+
+# Editor directories and files
+.vscode/
+.idea/
+.DS_Store
+
+# Temporary/system files
+*.tgz
+*.pem
+
+# OS files
+Thumbs.db
+
+# Ignore local assets if you edit them locally (uncomment to enable)
+# assets/*.psd
