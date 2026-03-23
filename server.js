@@ -2,9 +2,6 @@ const express = require("express");
 const path = require("path");
 
 const app = express();
-const PORT = 8000;
-
-app.use(express.json());
 app.use(express.static(__dirname));
 
 let scoreboardState = {
@@ -40,6 +37,10 @@ app.post("/reset", (req, res) => {
   res.json({ ok: true, state: scoreboardState });
 });
 
-app.listen(PORT, () => {
-  console.log(`Scoreboard server running at http://localhost:${PORT}`);
+const port = process.env.PORT || 3000;
+
+app.use(express.json());
+
+app.listen(port, () => {
+  console.log(`Listening on ${port}`);
 });
