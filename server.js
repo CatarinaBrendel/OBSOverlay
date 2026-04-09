@@ -18,6 +18,13 @@ let scoreboardState = {
   footerText: "TWITCH.TV/YOURCHANNEL"
 };
 
+// Keep a simple in-memory countdown state so overlays can sync on connect
+let countdownState = {
+  action: null, // 'start'|'stop'|'reset'|'label'|'sync'
+  duration: null,
+  label: ''
+};
+
 app.get("/state", (req, res) => {
   res.json(scoreboardState);
 });
@@ -31,6 +38,11 @@ app.get(["/", "/index.html"], (req, res) => {
 // Convenience route to open the overlay directly
 app.get(["/overlay", "/overlay.html"], (req, res) => {
   res.sendFile(path.join(__dirname, "overlay.html"));
+});
+
+// Countdown overlay
+app.get(["/countdown", "/countdown.html"], (req, res) => {
+  res.sendFile(path.join(__dirname, "countdown.html"));
 });
 
 const port = process.env.PORT || 3000;
@@ -51,6 +63,12 @@ function broadcastState() {
 // Attach WebSocket connection handler
 wss.on('connection', (ws) => {
   ws.send(JSON.stringify({ type: "state", state: scoreboardState }));
+  // send current countdown state so newly connected overlays get the latest label/duration
+  try {
+    ws.send(JSON.stringify({ type: 'countdown', ...countdownState }));
+  } catch (e) {
+    console.warn('Failed to send countdown sync to client', e);
+  }
 });
 
 // Overwrite the POST handlers to broadcast after updating state
@@ -59,6 +77,37 @@ app.post('/state', (req, res) => {
   scoreboardState = { ...scoreboardState, ...req.body };
   broadcastState();
   res.json({ ok: true, state: scoreboardState });
+});
+
+// Accept countdown commands from control UI and broadcast to overlay via WebSocket
+app.post('/countdown', (req, res) => {
+  const { action, duration, label } = req.body || {};
+  console.log('POST /countdown', { action, duration, label });
+
+  // validate action
+  if (!action || !['start','stop','reset','label'].includes(action)) {
+    return res.status(400).json({ ok: false, error: 'invalid action' });
+  }
+
+  // update in-memory countdownState
+  countdownState.action = action;
+  if (typeof duration === 'number') countdownState.duration = duration;
+  if (typeof label === 'string') countdownState.label = label;
+
+  const payload = { type: 'countdown', action };
+  if (typeof countdownState.duration === 'number') payload.duration = countdownState.duration;
+  if (typeof countdownState.label === 'string') payload.label = countdownState.label;
+
+  const msg = JSON.stringify(payload);
+  let sent = 0;
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      try { client.send(msg); sent++; } catch (e) { console.warn('Failed sending to client', e); }
+    }
+  });
+  console.log(`Broadcasted countdown (${action}) to ${sent} clients`);
+
+  res.json({ ok: true });
 });
 
 app.post('/reset', (req, res) => {

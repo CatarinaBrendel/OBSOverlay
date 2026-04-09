@@ -72,6 +72,22 @@
         Optional hotkeys while this page is focused: A = +1 left, L = +1 right, R = reset scores, S = swap players.
       </div>
     </div>
+
+    <div class="panel">
+      <h2>Countdown</h2>
+      <p>Enter minutes and seconds in the format <strong>MM:SS</strong> (e.g. 01:30) and control the overlay countdown.</p>
+      <div class="countdown-control">
+          <label for="countdownInput">Duration (MM:SS)</label>
+          <input id="countdownInput" type="text" placeholder="01:30" />
+          <label for="countdownLabelInput">Event label</label>
+          <input id="countdownLabelInput" type="text" placeholder="e.g. Next match: Player A vs Player B" />
+        <div class="button-grid">
+          <button type="button" onclick="startCountdownFromInput()">Start</button>
+          <button type="button" class="secondary" onclick="stopCountdown()">Stop</button>
+          <button type="button" class="secondary" onclick="resetCountdownFromInput()">Reset</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="control.js"></script>

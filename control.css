@@ -124,6 +124,39 @@
       gap: 10px;
     }
 
+    /* Countdown-specific layout: three buttons in a row, slightly smaller */
+    .countdown-control {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .countdown-control .button-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .countdown-control input {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 16px;
+      border-radius: 10px;
+    }
+
+    .countdown-control .button-grid button {
+      padding: 8px 10px;
+      font-size: 15px;
+      border-radius: 10px;
+    }
+
+    @media (max-width: 520px) {
+      .countdown-control .button-grid {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+    }
+
     button {
       border: none;
       border-radius: 12px;
@@ -141,6 +174,24 @@
 
     button.danger {
       background: var(--danger);
+    }
+
+    /* Pressed/active visual cue for buttons */
+    button {
+      transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+      will-change: transform, box-shadow;
+    }
+
+    button:active {
+      transform: scale(0.985);
+      filter: brightness(0.95);
+    }
+
+    /* transient class used by JS for a short press effect */
+    button.pressed {
+      transform: scale(0.98);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+      opacity: 0.98;
     }
 
     .actions {
