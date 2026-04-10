@@ -102,8 +102,8 @@
     .score-box {
       background: var(--panel-2);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px;
+      border-radius: 12px;
+      padding: 12px;
     }
 
     .score-box h2 {
@@ -112,16 +112,17 @@
     }
 
     .score-value {
-      font-size: 58px;
+      font-size: 44px;
       font-weight: 900;
       text-align: center;
-      margin: 8px 0 16px;
+      margin: 6px 0 12px;
+      line-height: 1;
     }
 
     .button-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
     }
 
     /* Countdown-specific layout: three buttons in a row, slightly smaller */
@@ -166,6 +167,14 @@
       cursor: pointer;
       background: var(--accent);
       color: white;
+    }
+
+    /* Slightly smaller buttons inside panels so multiple buttons fit on one line */
+    .panel .button-grid button {
+      padding: 10px 12px;
+      font-size: 15px;
+      border-radius: 10px;
+      font-weight: 700;
     }
 
     button.secondary {

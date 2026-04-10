@@ -49,6 +49,23 @@ const DEFAULT_STATE = {
 
     document.getElementById("leftScoreDisplay").textContent = state.leftScore;
     document.getElementById("rightScoreDisplay").textContent = state.rightScore;
+    // If the announcement editor is empty, pre-populate with the lobby template
+    try {
+      const left = state.leftName || '';
+      const right = state.rightName || '';
+      const templateText = `Lobby Id:\nUp next: ${left} x ${right}`;
+      if (typeof quill !== 'undefined' && quill) {
+        const existing = (quill.getText && quill.getText().trim()) || '';
+        if (!existing) {
+          try {
+            quill.setText(templateText);
+            // persist and update preview
+            try { localStorage.setItem(ANNOUNCE_KEY, quill.root.innerHTML); } catch (e) {}
+            try { updatePreview(); } catch (e) {}
+          } catch (e) { /* ignore setText errors */ }
+        }
+      }
+    } catch (e) {}
   }
 
   function bindTextInput(id) {
@@ -230,3 +247,303 @@ const DEFAULT_STATE = {
   }
 
   addButtonPressEffects();
+
+  // Announcements: send from control UI to server (HTML + align)
+  async function sendAnnouncement(html, align) {
+    try {
+      const payload = {};
+      if (typeof html === 'string' && html.trim()) payload.html = html;
+      else payload.text = '';
+      if (align) payload.align = align;
+      const url = (window.location && window.location.origin ? window.location.origin : '') + '/announce';
+      console.log('sending announce to', url, 'payload:', payload);
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    } catch (e) {
+      console.error('Announcement send error', e);
+      throw e;
+    }
+  }
+
+  const announceSendBtn = document.getElementById('announceSend');
+  const announceClearBtn = document.getElementById('announceClear');
+  const announceStatus = document.getElementById('announceStatus');
+
+  // Quill setup
+  const ANNOUNCE_KEY = 'scoreboard.announcementHtml';
+  const ANNOUNCE_ALIGN_KEY = 'scoreboard.announcementAlign';
+  let quill = null;
+  let currentAlign = 'center';
+  try {
+    try { const savedAlign = localStorage.getItem(ANNOUNCE_ALIGN_KEY); if (savedAlign) currentAlign = savedAlign; } catch (e) {}
+    // register size as an inline style so Quill outputs `style="font-size:..."`
+    try {
+      const Parchment = Quill.import('parchment');
+      const SizeStyle = new Parchment.Attributor.Style('size', 'font-size', { scope: Parchment.Scope.INLINE });
+      Quill.register(SizeStyle, true);
+    } catch (e) { /* ignore if register fails */ }
+    quill = new Quill('#announcementEditor', { modules: { toolbar: '#quillToolbar' }, theme: 'snow' });
+    try { const saved = localStorage.getItem(ANNOUNCE_KEY); if (saved) quill.root.innerHTML = saved; } catch (e) {}
+    quill.on('text-change', () => { try { localStorage.setItem(ANNOUNCE_KEY, quill.root.innerHTML); } catch (e) {} });
+  } catch (e) { console.warn('Quill init failed', e); }
+
+  // Ensure the toolbar size select explicitly applies the size format (fallback)
+  try {
+    const sizeSelect = document.querySelector('.ql-size');
+    if (sizeSelect) sizeSelect.addEventListener('change', (ev) => {
+      try { if (quill) quill.format('size', ev.target.value); } catch (e) { /* ignore */ }
+    });
+  } catch (e) {}
+
+  // derive alignment from first block
+  function updateCurrentAlign() {
+    try {
+      if (!quill) return;
+      const [line] = quill.getLines(0, 1) || [];
+      const formats = line ? line.formats() : {};
+      // Quill represents left alignment as either undefined or an empty string.
+      // Treat empty/undefined as 'left' instead of falling back to 'center'.
+      let a = (formats && typeof formats.align !== 'undefined') ? formats.align : null;
+      if (!a || a === '') a = 'left';
+      currentAlign = a;
+      try { localStorage.setItem(ANNOUNCE_ALIGN_KEY, currentAlign); } catch (e) {}
+    } catch (e) {}
+  }
+  try { updateCurrentAlign(); } catch (e) {}
+  if (quill) { quill.on('text-change', updateCurrentAlign); quill.on('selection-change', updateCurrentAlign); }
+
+  // live preview element
+  const announcePreviewEl = document.getElementById('announcementPreview');
+
+  // updatePreview: normalize sizes, sanitize, and render into local preview
+  function updatePreview() {
+    if (!announcePreviewEl || !quill) return;
+    try {
+      const raw = quill.root.innerHTML;
+      const normalized = normalizeSizeClasses(raw);
+      const safe = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(normalized, { ALLOWED_ATTR: ['style', 'class'] }) : normalized;
+      announcePreviewEl.innerHTML = safe;
+      try { announcePreviewEl.style.textAlign = currentAlign || 'center'; } catch (e) {}
+    } catch (e) { /* ignore preview errors */ }
+  }
+  // wire preview updates
+  if (quill) {
+    quill.on('text-change', updatePreview);
+    quill.on('selection-change', updatePreview);
+  }
+
+  // ensure size select applies format and updates preview immediately
+  try {
+    const sizeSelect = document.querySelector('.ql-size');
+    if (sizeSelect) sizeSelect.addEventListener('change', (ev) => {
+      try { if (quill) quill.format('size', ev.target.value); } catch (e) { /* ignore */ }
+      try { updatePreview(); } catch (e) {}
+    });
+  } catch (e) {}
+
+  // initial preview render
+  try { updatePreview(); } catch (e) {}
+
+  if (announceSendBtn) {
+    announceSendBtn.addEventListener('click', async () => {
+      console.log('announceSend clicked');
+      const plain = quill ? quill.getText().trim() : '';
+      console.log('quill present:', !!quill, 'plain length:', (plain && plain.length) || 0);
+      if (!plain) { announceStatus.textContent = 'Enter a message first.'; return; }
+      announceSendBtn.disabled = true;
+      announceStatus.textContent = 'Sending...';
+      try {
+        // Ensure selection's size format is applied as an explicit value if it's a keyword
+        try {
+          const range = quill.getSelection && quill.getSelection();
+          const sizeMapEm = { small: '2.25em', medium: '1em', large: '3.75em', huge: '7.5em' };
+          let currentSize = null;
+          try {
+            currentSize = range ? quill.getFormat(range).size : quill.getFormat().size;
+          } catch (e) { try { currentSize = quill.getFormat().size; } catch (e2) { currentSize = null; } }
+          if (currentSize && sizeMapEm[currentSize]) {
+            try {
+              // apply as explicit em value so it serializes correctly
+              if (range && range.length > 0) {
+                quill.formatText(range.index, range.length, 'size', sizeMapEm[currentSize]);
+              } else {
+                quill.format('size', sizeMapEm[currentSize]);
+              }
+            } catch (e) { /* ignore formatting errors */ }
+          }
+        } catch (e) {}
+
+        // Simple HTML escaper for inserted text
+        function escapeHtml(str) {
+          if (typeof str !== 'string') return '';
+          return str.replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+        }
+
+        // Build HTML from Quill Delta to reliably capture formats (size, bold, italic)
+        function deltaToHtml(delta) {
+          if (!delta || !delta.ops) return '';
+          const sizeMapEm = { small: '2.25em', medium: '1em', large: '3.75em', huge: '7.5em' };
+          const paragraphs = [];
+          let current = '';
+
+          function wrapWithAttrs(text, attrs) {
+            let out = text;
+            if (!attrs) return out;
+            if (attrs.bold) out = `<strong>${out}</strong>`;
+            if (attrs.italic) out = `<em>${out}</em>`;
+            if (attrs.size) {
+              const v = attrs.size;
+              const sizeVal = sizeMapEm[v] || v;
+              out = `<span style="font-size: ${sizeVal};">${out}</span>`;
+            }
+            return out;
+          }
+
+          delta.ops.forEach(op => {
+            if (typeof op.insert === 'string') {
+              const parts = op.insert.split('\n');
+              parts.forEach((part, idx) => {
+                if (part.length) current += wrapWithAttrs(escapeHtml(part), op.attributes);
+                if (idx < parts.length - 1) {
+                  // newline -> paragraph break
+                  paragraphs.push(`<p>${current}</p>`);
+                  current = '';
+                }
+              });
+            } else {
+              // non-string inserts (embeds) - ignore or handle as needed
+            }
+          });
+          if (current) paragraphs.push(`<p>${current}</p>`);
+          return paragraphs.join('');
+        }
+
+        const rawHtml = quill ? deltaToHtml(quill.getContents()) : '';
+        // convert Quill size classes (ql-size-*) to inline font-size styles so they survive sanitization
+        function normalizeSizeClasses(html) {
+
+          if (!html) return html;
+          const wrapper = document.createElement('div');
+          wrapper.innerHTML = html;
+
+          // Helper: measure computed font-size for a class or keyword by inserting a temp element
+          function measureFontSizeForClassOrKeyword(options) {
+            const { cls, keyword, baseEl } = options || {};
+            const temp = document.createElement('span');
+            if (cls) temp.className = cls;
+            if (keyword) temp.style.fontSize = keyword;
+            // keep out of flow and invisible
+            temp.style.position = 'absolute';
+            temp.style.visibility = 'hidden';
+            (baseEl || document.body).appendChild(temp);
+            const val = window.getComputedStyle(temp).fontSize;
+            temp.parentNode.removeChild(temp);
+            return val;
+          }
+
+          // Replace elements that use Quill size classes (ql-size-*) or keyword font-size
+          // with inline em font-size values so they scale relative to overlay base size.
+          const sizeMapEm = {
+            'ql-size-small': '0.85em',
+            'ql-size-large': '2.5em',
+            'ql-size-huge': '3.5em',
+            'small': '0.855em',
+            'medium': '1em',
+            'large': '2.5em',
+            'huge': '3.5em'
+          };
+
+          const all = wrapper.querySelectorAll('*');
+          all.forEach(n => {
+            try {
+              // handle class-based sizes
+              const clsList = Array.from(n.classList || []).filter(c => c && c.startsWith('ql-size'));
+              if (clsList.length) {
+                const cls = clsList[0];
+                const em = sizeMapEm[cls] || null;
+                if (em) {
+                  const prev = n.getAttribute('style') || '';
+                  n.setAttribute('style', `font-size: ${em}; ${prev}`);
+                }
+                clsList.forEach(c => n.classList.remove(c));
+                return;
+              }
+              // handle inline keyword values like 'small'/'large'
+              const inlineFs = (n.style && n.style.getPropertyValue('font-size')) || '';
+              const key = inlineFs && inlineFs.trim().toLowerCase();
+              if (key && sizeMapEm[key]) {
+                n.style.fontSize = sizeMapEm[key];
+              }
+            } catch (e) { /* ignore per-node errors */ }
+          });
+
+          return wrapper.innerHTML;
+        }
+
+        const normalized = normalizeSizeClasses(rawHtml);
+        // debug: log output so we can inspect what HTML is being sent
+        try { console.log('Announcement raw HTML:', rawHtml); console.log('Announcement normalized HTML:', normalized); } catch (e) {}
+        const safe = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(normalized) : normalized;
+        console.log('announce payload', { html: safe, align: currentAlign });
+        const json = await sendAnnouncement(safe, currentAlign);
+        if (json && json.ok) announceStatus.textContent = 'Announcement sent.';
+        else announceStatus.textContent = 'Error: ' + (json && json.error ? json.error : 'unknown');
+      } catch (e) {
+        console.error('Send handler error', e);
+        announceStatus.textContent = 'Network error: ' + (e && e.message ? e.message : 'unknown');
+      } finally {
+        announceSendBtn.disabled = false;
+        setTimeout(() => { announceStatus.textContent = ''; }, 3000);
+      }
+    });
+  }
+
+  if (announceClearBtn) {
+    announceClearBtn.addEventListener('click', async () => {
+      if (quill) quill.setContents([]);
+      announceStatus.textContent = '';
+      try { localStorage.removeItem(ANNOUNCE_KEY); } catch (e) {}
+      try {
+        await fetch('/announce', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'clear' }) });
+      } catch (e) { /* ignore */ }
+    });
+  }
+
+  // Update the "Player 1 x Player 2" line in the announcement to match left/right name inputs
+  const announceUpdateBtn = document.getElementById('announceUpdateNames');
+  if (announceUpdateBtn) {
+    announceUpdateBtn.addEventListener('click', () => {
+      try {
+        if (!quill) return;
+        const left = (document.getElementById('leftName') && document.getElementById('leftName').value) || '';
+        const right = (document.getElementById('rightName') && document.getElementById('rightName').value) || '';
+        // get current plain text (trim trailing newline)
+        const raw = (quill.getText && quill.getText()) || '';
+        const text = raw.replace(/\n$/, '');
+        const lines = text.split('\n');
+        if (lines.length >= 2) {
+          lines[1] = `Up next: ${left} x ${right}`;
+        } else if (lines.length === 1 && lines[0].trim() === '') {
+          lines[0] = 'Lobby Id:';
+          lines.push(`Up next: ${left} x ${right}`);
+        } else {
+          // append second line
+          lines.push(`Up next: ${left} x ${right}`);
+        }
+        const newText = lines.join('\n');
+        quill.setText(newText);
+        try { localStorage.setItem(ANNOUNCE_KEY, quill.root.innerHTML); } catch (e) {}
+        try { updatePreview(); } catch (e) {}
+      } catch (e) {
+        console.error('Update names error', e);
+      }
+    });
+  }
