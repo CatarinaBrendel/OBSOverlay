@@ -15,9 +15,19 @@
 </head>
 <body>
   <div class="header">Challonge Module</div>
+  <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#fff;">
+    <div style="font-size:13px;color:#222;font-weight:600">Zoom</div>
+    <button id="zoomOut" style="padding:6px 8px">-</button>
+    <input id="zoomRange" type="range" min="0.5" max="2" step="0.05" value="1" style="width:240px" />
+    <button id="zoomIn" style="padding:6px 8px">+</button>
+    <button id="zoomReset" style="margin-left:8px;padding:6px 8px" class="secondary">Reset</button>
+    <div id="zoomLabel" style="margin-left:8px;color:#444;font-size:13px">100%</div>
+  </div>
   <div class="note">Embedded view of the Challonge module. If embedding is blocked, open it directly: <a href="https://challonge.com/de/2XKOvsSFAPAC2/module" target="_blank" rel="noopener">Open Challonge module</a></div>
   <div class="container">
-    <iframe id="challongeFrame" scrolling="auto" allowtransparency="true"></iframe>
+    <div id="zoomWrapper" style="--scale:1;overflow:hidden;height:100%;width:100%;display:block;">
+      <iframe id="challongeFrame" scrolling="auto" allowtransparency="true" style="transform-origin:0 0;transform:scale(var(--scale));width:calc(100% / var(--scale));height:calc(100% / var(--scale));border:0;display:block"></iframe>
+    </div>
   </div>
 
   <script>
@@ -36,6 +46,21 @@
           frame.removeAttribute('srcdoc');
           frame.src = data.src;
         }
+        // apply server-provided scale if present
+        try {
+          if (typeof data.scale !== 'undefined' && data.scale !== null) {
+            const s = Number(data.scale) || 1;
+            const wrapper = document.getElementById('zoomWrapper');
+            if (wrapper) {
+              wrapper.style.setProperty('--scale', s);
+              const range = document.getElementById('zoomRange');
+              const label = document.getElementById('zoomLabel');
+              if (range) range.value = s;
+              if (label) label.textContent = Math.round(s * 100) + '%';
+              try { localStorage.setItem('challonge.scale', String(s)); } catch (e) {}
+            }
+          }
+        } catch (e) {}
       } catch (e) { console.warn('Failed to load iframe state', e); }
     }
 
@@ -58,6 +83,21 @@
                 frame.removeAttribute('srcdoc');
                 frame.src = msg.iframe.src;
               }
+              // apply remote scale if provided
+              try {
+                if (typeof msg.iframe.scale !== 'undefined' && msg.iframe.scale !== null) {
+                  const s = Number(msg.iframe.scale) || 1;
+                  const wrapper = document.getElementById('zoomWrapper');
+                  if (wrapper) {
+                    wrapper.style.setProperty('--scale', s);
+                    const range = document.getElementById('zoomRange');
+                    const label = document.getElementById('zoomLabel');
+                    if (range) range.value = s;
+                    if (label) label.textContent = Math.round(s * 100) + '%';
+                    try { localStorage.setItem('challonge.scale', String(s)); } catch (e) {}
+                  }
+                }
+              } catch (e) {}
             }
           } catch (e) {}
         });
@@ -66,6 +106,43 @@
 
     loadIframe();
     setupWs();
+
+    // Zoom controls
+    const range = document.getElementById('zoomRange');
+    const label = document.getElementById('zoomLabel');
+    const wrapper = document.getElementById('zoomWrapper');
+    const zoomIn = document.getElementById('zoomIn');
+    const zoomOut = document.getElementById('zoomOut');
+    const zoomReset = document.getElementById('zoomReset');
+
+    function setScale(s) {
+      s = Number(s) || 1;
+      if (s <= 0) s = 1;
+      wrapper.style.setProperty('--scale', s);
+      range.value = s;
+      label.textContent = Math.round(s * 100) + '%';
+      try { localStorage.setItem('challonge.scale', String(s)); } catch (e) {}
+    }
+
+    // init from query param or localStorage
+    (function() {
+      let initial = 1;
+      try {
+        const params = new URLSearchParams(location.search);
+        const q = params.get('scale');
+        if (q) initial = Number(q) || initial;
+        else {
+          const saved = localStorage.getItem('challonge.scale');
+          if (saved) initial = Number(saved) || initial;
+        }
+      } catch (e) {}
+      setScale(initial);
+    })();
+
+    if (range) range.addEventListener('input', (e) => setScale(e.target.value));
+    if (zoomIn) zoomIn.addEventListener('click', () => setScale(Math.min(2, Number(range.value) + 0.05)));
+    if (zoomOut) zoomOut.addEventListener('click', () => setScale(Math.max(0.5, Number(range.value) - 0.05)));
+    if (zoomReset) zoomReset.addEventListener('click', () => setScale(1));
   </script>
 </body>
 </html>

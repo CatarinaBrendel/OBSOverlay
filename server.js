@@ -38,11 +38,11 @@ let scoreboardState = {
 
 // iframe state persisted to file so control UI can update the embed
 const iframeStateFile = path.join(__dirname, 'iframe.json');
-let iframeState = { src: 'https://challonge.com/de/2XKOvsSFAPAC2/module', html: null };
+let iframeState = { src: 'https://challonge.com/de/2XKOvsSFAPAC2/module', html: null, scale: 1 };
 try {
   if (fs.existsSync(iframeStateFile)) {
     const raw = fs.readFileSync(iframeStateFile, 'utf8');
-    try { iframeState = JSON.parse(raw); } catch (e) { /* ignore parse errors */ }
+    try { const parsed = JSON.parse(raw); iframeState = Object.assign(iframeState, parsed); } catch (e) { /* ignore parse errors */ }
   }
 } catch (e) {}
 
@@ -159,13 +159,13 @@ app.get('/iframe', (req, res) => {
 
 app.post('/iframe', (req, res) => {
   const { src, html } = req.body || {};
-  if (!src && !html) return res.status(400).json({ ok: false, error: 'missing src or html' });
+  const { scale } = req.body || {};
+  if (!src && !html && typeof scale !== 'number' && typeof scale !== 'string') return res.status(400).json({ ok: false, error: 'missing src/html/scale' });
 
-  // prefer explicit html if provided, otherwise set src
-  iframeState = {
-    src: typeof src === 'string' ? src : iframeState.src,
-    html: typeof html === 'string' ? html : (typeof src === 'string' ? null : iframeState.html)
-  };
+  // prefer explicit html if provided, otherwise set src; also accept scale
+  if (typeof src === 'string') iframeState.src = src;
+  if (typeof html === 'string') iframeState.html = html;
+  if (typeof scale === 'number' || (typeof scale === 'string' && !isNaN(Number(scale)))) iframeState.scale = Number(scale);
 
   try { fs.writeFileSync(iframeStateFile, JSON.stringify(iframeState, null, 2)); } catch (e) { console.warn('Failed to persist iframe state', e); }
 
