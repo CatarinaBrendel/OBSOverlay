@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Challonge Module</title>
+  <style>
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f7f7f7}
+    .header{height:56px;display:flex;align-items:center;padding:0 16px;background:#0b1220;color:#fff;font-weight:600}
+    .container{height:calc(100vh - 56px)}
+    iframe{border:0;width:100%;height:100%;display:block}
+    .note{padding:10px 16px;color:#444;background:#fff;border-bottom:1px solid #e6e6e6}
+    a{color:#1a73e8}
+  </style>
+</head>
+<body>
+  <div class="header">Challonge Module</div>
+  <div class="note">Embedded view of the Challonge module. If embedding is blocked, open it directly: <a href="https://challonge.com/de/2XKOvsSFAPAC2/module" target="_blank" rel="noopener">Open Challonge module</a></div>
+  <div class="container">
+    <iframe id="challongeFrame" scrolling="auto" allowtransparency="true"></iframe>
+  </div>
+
+  <script>
+    async function loadIframe() {
+      try {
+        const res = await fetch('/iframe', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const frame = document.getElementById('challongeFrame');
+        if (!frame) return;
+        if (data.html) {
+          // set HTML embed directly
+          frame.removeAttribute('src');
+          frame.srcdoc = data.html;
+        } else if (data.src) {
+          frame.removeAttribute('srcdoc');
+          frame.src = data.src;
+        }
+      } catch (e) { console.warn('Failed to load iframe state', e); }
+    }
+
+    // listen for websocket updates so the page updates when control saves
+    function setupWs() {
+      try {
+        const proto = (location.protocol === 'https:') ? 'wss:' : 'ws:';
+        const wsUrl = proto + '//' + location.host;
+        const ws = new WebSocket(wsUrl);
+        ws.addEventListener('message', (ev) => {
+          try {
+            const msg = JSON.parse(ev.data);
+            if (msg && msg.type === 'iframe' && msg.iframe) {
+              const frame = document.getElementById('challongeFrame');
+              if (!frame) return;
+              if (msg.iframe.html) {
+                frame.removeAttribute('src');
+                frame.srcdoc = msg.iframe.html;
+              } else if (msg.iframe.src) {
+                frame.removeAttribute('srcdoc');
+                frame.src = msg.iframe.src;
+              }
+            }
+          } catch (e) {}
+        });
+      } catch (e) {}
+    }
+
+    loadIframe();
+    setupWs();
+  </script>
+</body>
+</html>

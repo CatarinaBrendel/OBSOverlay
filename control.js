@@ -312,6 +312,88 @@ const DEFAULT_STATE = {
 
   addButtonPressEffects();
 
+  // ---- Iframe (Challonge) controls ----
+  async function getIframeState() {
+    try {
+      const res = await fetch('/iframe', { cache: 'no-store' });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) { return null; }
+  }
+
+  async function setIframeState(payload) {
+    try {
+      const res = await fetch('/iframe', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      return await res.json();
+    } catch (e) { return null; }
+  }
+
+  function extractSrcFromInput(text) {
+    if (!text) return '';
+    const trimmed = text.trim();
+    // If user pasted a full iframe tag, try to extract src attribute
+    if (trimmed.toLowerCase().startsWith('<iframe')) {
+      const m = trimmed.match(/src\s*=\s*"([^"]+)"/i) || trimmed.match(/src\s*=\s*'([^']+)'/i);
+      if (m && m[1]) return m[1];
+      return '';
+    }
+    return trimmed;
+  }
+
+  async function initIframeControls() {
+    const input = document.getElementById('iframeInput');
+    const saveBtn = document.getElementById('iframeSaveBtn');
+    const previewBtn = document.getElementById('iframePreviewBtn');
+    const status = document.getElementById('iframeStatus');
+    const previewEl = document.getElementById('iframePreview');
+
+    try {
+      const state = await getIframeState();
+      if (state) {
+        if (state.html) input.value = state.html;
+        else if (state.src) input.value = state.src;
+        if (previewEl && state.src) previewEl.src = state.src;
+        else if (previewEl && state.html) previewEl.srcdoc = state.html;
+      }
+    } catch (e) { /* ignore */ }
+
+    if (previewBtn) previewBtn.addEventListener('click', () => {
+      const val = input.value || '';
+      const src = extractSrcFromInput(val);
+      if (src) {
+        previewEl.removeAttribute('srcdoc');
+        previewEl.src = src;
+      } else {
+        // if it's probably an iframe tag, set as srcdoc
+        previewEl.src = 'about:blank';
+        previewEl.srcdoc = val;
+      }
+    });
+
+    if (saveBtn) saveBtn.addEventListener('click', async () => {
+      saveBtn.disabled = true; status.textContent = 'Saving...';
+      try {
+        const val = input.value || '';
+        const src = extractSrcFromInput(val);
+        let payload;
+        if (src) payload = { src };
+        else payload = { html: val };
+        const json = await setIframeState(payload);
+        if (json && json.ok) {
+          status.textContent = 'Saved.';
+        } else {
+          status.textContent = 'Error saving.';
+        }
+      } catch (e) { status.textContent = 'Network error.'; }
+      finally { saveBtn.disabled = false; setTimeout(() => { status.textContent = ''; }, 2000); }
+    });
+  }
+
+  // initialize iframe controls after page load
+  try { initIframeControls(); } catch (e) { /* ignore init errors */ }
+
   // Announcements: send from control UI to server (HTML + align)
   async function sendAnnouncement(html, align) {
     try {

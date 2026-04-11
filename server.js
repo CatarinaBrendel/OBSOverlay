@@ -1,5 +1,6 @@
 const express = require("express");
 const path = require("path");
+const fs = require('fs');
 const http = require("http");
 const WebSocket = require("ws");
 
@@ -34,6 +35,16 @@ let scoreboardState = {
   roundText: "POOLS",
   footerText: "TWITCH.TV/YOURCHANNEL"
 };
+
+// iframe state persisted to file so control UI can update the embed
+const iframeStateFile = path.join(__dirname, 'iframe.json');
+let iframeState = { src: 'https://challonge.com/de/2XKOvsSFAPAC2/module', html: null };
+try {
+  if (fs.existsSync(iframeStateFile)) {
+    const raw = fs.readFileSync(iframeStateFile, 'utf8');
+    try { iframeState = JSON.parse(raw); } catch (e) { /* ignore parse errors */ }
+  }
+} catch (e) {}
 
 // Keep a simple in-memory countdown state so overlays can sync on connect
 let countdownState = {
@@ -96,6 +107,10 @@ wss.on('connection', (ws) => {
   } catch (e) {
     console.warn('Failed to send countdown sync to client', e);
   }
+  // send current iframe state so clients can load dynamic embed
+  try {
+    ws.send(JSON.stringify({ type: 'iframe', iframe: iframeState }));
+  } catch (e) {}
 });
 
 // Overwrite the POST handlers to broadcast after updating state
@@ -135,6 +150,34 @@ app.post('/countdown', (req, res) => {
   console.log(`Broadcasted countdown (${action}) to ${sent} clients`);
 
   res.json({ ok: true });
+});
+
+// GET/POST for iframe embed configuration
+app.get('/iframe', (req, res) => {
+  res.json(iframeState);
+});
+
+app.post('/iframe', (req, res) => {
+  const { src, html } = req.body || {};
+  if (!src && !html) return res.status(400).json({ ok: false, error: 'missing src or html' });
+
+  // prefer explicit html if provided, otherwise set src
+  iframeState = {
+    src: typeof src === 'string' ? src : iframeState.src,
+    html: typeof html === 'string' ? html : (typeof src === 'string' ? null : iframeState.html)
+  };
+
+  try { fs.writeFileSync(iframeStateFile, JSON.stringify(iframeState, null, 2)); } catch (e) { console.warn('Failed to persist iframe state', e); }
+
+  // broadcast via websocket so open overlays can update immediately
+  const msg = JSON.stringify({ type: 'iframe', iframe: iframeState });
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      try { client.send(msg); } catch (e) { console.warn('Failed sending iframe to client', e); }
+    }
+  });
+
+  res.json({ ok: true, iframe: iframeState });
 });
 
 // Accept announcements from control UI and broadcast to overlay via WebSocket
