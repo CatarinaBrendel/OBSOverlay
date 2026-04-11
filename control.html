@@ -100,6 +100,20 @@
     </div>
 
     <div class="panel">
+      <h2>Lobby ID</h2>
+      <p>Enter a Lobby identifier to show on the lobby overlay (prefix pre-filled).</p>
+      <div>
+        <label for="lobbyInput">Lobby</label>
+        <input id="lobbyInput" type="text" value="Lobby ID: " />
+      </div>
+      <div class="button-grid" style="margin-top:8px">
+        <button type="button" id="lobbySend">Send</button>
+        <button type="button" id="lobbyClear" class="secondary">Clear</button>
+      </div>
+      <div id="lobbyStatus" style="margin-top:8px;color:#ddd"></div>
+    </div>
+
+    <div class="panel">
       <h2>Announcements</h2>
       <p>Type a message and send it to all connected overlays (visible in OBS).</p>
       <div>

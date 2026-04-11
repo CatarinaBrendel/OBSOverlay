@@ -12,6 +12,70 @@ const DEFAULT_STATE = {
     return await response.json();
   }
 
+  // Lobby ID controls
+  async function sendLobbyId(id) {
+    try {
+      const payload = { id: id };
+      const res = await fetch('/lobby', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    } catch (e) {
+      console.error('Lobby send error', e);
+      throw e;
+    }
+  }
+
+  const lobbySendBtn = document.getElementById('lobbySend');
+  const lobbyClearBtn = document.getElementById('lobbyClear');
+  const lobbyInput = document.getElementById('lobbyInput');
+  const lobbyStatus = document.getElementById('lobbyStatus');
+
+  if (lobbySendBtn && lobbyInput) {
+    lobbySendBtn.addEventListener('click', async () => {
+      const val = (lobbyInput.value || '').trim();
+      if (!val) { lobbyStatus.textContent = 'Enter a Lobby ID.'; return; }
+      lobbySendBtn.disabled = true;
+      lobbyStatus.textContent = 'Sending...';
+      try {
+        const payload = val; // send the full input including the "Lobby ID: " prefix
+        const json = await sendLobbyId(payload);
+        if (json && json.ok) lobbyStatus.textContent = 'Lobby sent.';
+        else lobbyStatus.textContent = 'Error sending lobby.';
+      } catch (e) {
+        lobbyStatus.textContent = 'Network error.';
+      } finally {
+        lobbySendBtn.disabled = false;
+        setTimeout(() => { if (lobbyStatus) lobbyStatus.textContent = ''; }, 2000);
+      }
+    });
+  }
+
+  if (lobbyClearBtn) {
+    lobbyClearBtn.addEventListener('click', async () => {
+      try {
+        lobbyInput.value = 'Lobby ID: ';
+        await sendLobbyId('');
+        if (lobbyStatus) lobbyStatus.textContent = 'Cleared.';
+        setTimeout(() => { if (lobbyStatus) lobbyStatus.textContent = ''; }, 1500);
+      } catch (e) { if (lobbyStatus) lobbyStatus.textContent = 'Network error.'; }
+    });
+  }
+
+  // focus behavior: place caret at end when focusing default prefix
+  if (lobbyInput) {
+    lobbyInput.addEventListener('focus', (e) => {
+      const el = e.target;
+      if (el.value === 'Lobby ID: ') {
+        // move caret to end
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
+      }
+    });
+  }
+
   async function setState(state) {
     await fetch("/state", {
       method: "POST",
@@ -53,7 +117,7 @@ const DEFAULT_STATE = {
     try {
       const left = state.leftName || '';
       const right = state.rightName || '';
-      const templateText = `Lobby Id:\nUp next: ${left} x ${right}`;
+      const templateText = `Up next:\n${left} x ${right}`;
       if (typeof quill !== 'undefined' && quill) {
         const existing = (quill.getText && quill.getText().trim()) || '';
         if (!existing) {
@@ -529,17 +593,20 @@ const DEFAULT_STATE = {
         const raw = (quill.getText && quill.getText()) || '';
         const text = raw.replace(/\n$/, '');
         const lines = text.split('\n');
-        if (lines.length >= 2) {
-          lines[1] = `Up next: ${left} x ${right}`;
-        } else if (lines.length === 1 && lines[0].trim() === '') {
-          lines[0] = 'Lobby Id:';
-          lines.push(`Up next: ${left} x ${right}`);
+        // Ensure first line is the header and second line is the players
+        const header = 'Up next:';
+        const players = `${left} x ${right}`;
+        if (lines.length === 0 || (lines.length === 1 && lines[0].trim() === '')) {
+          // empty editor -> set header + players
+          quill.setText(header + '\n' + players);
         } else {
-          // append second line
-          lines.push(`Up next: ${left} x ${right}`);
+          // make sure at least two lines exist
+          lines[0] = header;
+          if (lines.length >= 2) lines[1] = players;
+          else lines.push(players);
+          // preserve any additional lines after line 2
+          quill.setText(lines.join('\n'));
         }
-        const newText = lines.join('\n');
-        quill.setText(newText);
         try { localStorage.setItem(ANNOUNCE_KEY, quill.root.innerHTML); } catch (e) {}
         try { updatePreview(); } catch (e) {}
       } catch (e) {

@@ -62,6 +62,11 @@ app.get(["/countdown", "/countdown.html"], (req, res) => {
   res.sendFile(path.join(__dirname, "countdown.html"));
 });
 
+// Lobby overlay (shows a single Lobby ID)
+app.get(["/lobby", "/lobby.html"], (req, res) => {
+  res.sendFile(path.join(__dirname, "lobby.html"));
+});
+
 // Announcement overlay (output-only) for OBS
 app.get(["/announcement", "/announcement.html"], (req, res) => {
   res.sendFile(path.join(__dirname, "announcement.html"));
@@ -164,6 +169,24 @@ app.post('/announce', (req, res) => {
     }
   });
   console.log(`Broadcasted announcement to ${sent} clients`);
+
+  res.json({ ok: true });
+});
+
+// Accept lobby ID from control UI and broadcast to overlay via WebSocket
+app.post('/lobby', (req, res) => {
+  const { id } = req.body || {};
+  console.log('POST /lobby', { id: typeof id === 'string' ? id.slice(0,200) : id, origin: req.headers.origin });
+
+  const payload = { type: 'lobby', id: (typeof id === 'string' ? id.trim() : '') };
+  const msg = JSON.stringify(payload);
+  let sent = 0;
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      try { client.send(msg); sent++; } catch (e) { console.warn('Failed sending lobby to client', e); }
+    }
+  });
+  console.log(`Broadcasted lobby to ${sent} clients`);
 
   res.json({ ok: true });
 });
