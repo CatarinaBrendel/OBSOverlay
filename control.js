@@ -4,7 +4,7 @@ const DEFAULT_STATE = {
     leftScore: 0,
     rightScore: 0,
     roundText: "POOLS",
-    footerText: "TWITCH.TV/YOURCHANNEL"
+    footerText: "#StillFantastic"
   };
 
   async function getState() {
