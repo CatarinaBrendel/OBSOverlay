@@ -5,6 +5,7 @@ const http = require("http");
 const WebSocket = require("ws");
 
 const app = express();
+// serve static files from repo root, but expose organized folders `control/` and `overlays/`
 app.use(express.static(__dirname));
 
 // parse JSON bodies for POST requests
@@ -32,8 +33,8 @@ let scoreboardState = {
   rightName: "PLAYER 2",
   leftScore: 0,
   rightScore: 0,
-  roundText: "POOLS",
-  footerText: "TWITCH.TV/YOURCHANNEL"
+  roundText: "BRACKETS",
+  footerText: "#StillFantastic"
 };
 
 // iframe state persisted to file so control UI can update the embed
@@ -60,27 +61,38 @@ app.get("/state", (req, res) => {
 
 // Serve control UI at root and index.html
 app.get(["/", "/index.html"], (req, res) => {
-  res.sendFile(path.join(__dirname, "control.html"));
+  // prefer new control folder if present
+  const controlPath = path.join(__dirname, 'control', 'control.html');
+  if (fs.existsSync(controlPath)) return res.sendFile(controlPath);
+  return res.sendFile(path.join(__dirname, "control.html"));
 });
 
 // Convenience route to open the overlay directly
 app.get(["/overlay", "/overlay.html"], (req, res) => {
-  res.sendFile(path.join(__dirname, "overlay.html"));
+  const overlayPath = path.join(__dirname, 'overlays', 'overlay.html');
+  if (fs.existsSync(overlayPath)) return res.sendFile(overlayPath);
+  return res.sendFile(path.join(__dirname, "overlay.html"));
 });
 
 // Countdown overlay
 app.get(["/countdown", "/countdown.html"], (req, res) => {
-  res.sendFile(path.join(__dirname, "countdown.html"));
+  const p = path.join(__dirname, 'overlays', 'countdown.html');
+  if (fs.existsSync(p)) return res.sendFile(p);
+  return res.sendFile(path.join(__dirname, "countdown.html"));
 });
 
 // Lobby overlay (shows a single Lobby ID)
 app.get(["/lobby", "/lobby.html"], (req, res) => {
-  res.sendFile(path.join(__dirname, "lobby.html"));
+  const p = path.join(__dirname, 'overlays', 'lobby.html');
+  if (fs.existsSync(p)) return res.sendFile(p);
+  return res.sendFile(path.join(__dirname, "lobby.html"));
 });
 
 // Announcement overlay (output-only) for OBS
 app.get(["/announcement", "/announcement.html"], (req, res) => {
-  res.sendFile(path.join(__dirname, "announcement.html"));
+  const p = path.join(__dirname, 'overlays', 'announcement.html');
+  if (fs.existsSync(p)) return res.sendFile(p);
+  return res.sendFile(path.join(__dirname, "announcement.html"));
 });
 
 const port = process.env.PORT || 3000;
@@ -241,7 +253,7 @@ app.post('/reset', (req, res) => {
     leftScore: 0,
     rightScore: 0,
     roundText: "BRACKETS",
-    footerText: "TWITCH.TV/YOURCHANNEL"
+    footerText: "#StilLFantastic"
   };
   broadcastState();
   res.json({ ok: true, state: scoreboardState });

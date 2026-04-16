@@ -39,14 +39,12 @@
         const frame = document.getElementById('challongeFrame');
         if (!frame) return;
         if (data.html) {
-          // set HTML embed directly
           frame.removeAttribute('src');
           frame.srcdoc = data.html;
         } else if (data.src) {
           frame.removeAttribute('srcdoc');
           frame.src = data.src;
         }
-        // apply server-provided scale if present
         try {
           if (typeof data.scale !== 'undefined' && data.scale !== null) {
             const s = Number(data.scale) || 1;
@@ -64,7 +62,6 @@
       } catch (e) { console.warn('Failed to load iframe state', e); }
     }
 
-    // listen for websocket updates so the page updates when control saves
     function setupWs() {
       try {
         const proto = (location.protocol === 'https:') ? 'wss:' : 'ws:';
@@ -83,7 +80,6 @@
                 frame.removeAttribute('srcdoc');
                 frame.src = msg.iframe.src;
               }
-              // apply remote scale if provided
               try {
                 if (typeof msg.iframe.scale !== 'undefined' && msg.iframe.scale !== null) {
                   const s = Number(msg.iframe.scale) || 1;
@@ -107,7 +103,6 @@
     loadIframe();
     setupWs();
 
-    // Zoom controls
     const range = document.getElementById('zoomRange');
     const label = document.getElementById('zoomLabel');
     const wrapper = document.getElementById('zoomWrapper');
@@ -124,7 +119,6 @@
       try { localStorage.setItem('challonge.scale', String(s)); } catch (e) {}
     }
 
-    // init from query param or localStorage
     (function() {
       let initial = 1;
       try {

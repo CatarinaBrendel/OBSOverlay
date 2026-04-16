@@ -1,0 +1,5 @@
+.countdown-root { position: absolute; inset: 0; display:flex; flex-direction:column; align-items:center; justify-content:center }
+.timer { font-size: 160px; font-weight: 900; color: #fff }
+.label { font-size: 26px; color: #fff; margin-top: 8px }
+
+body { background: transparent }

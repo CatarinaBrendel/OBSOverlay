@@ -1,0 +1,5 @@
+.lobby.hidden { display:none }
+.lobby { font-size: 48px; color:#fff; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.6); padding:20px 28px; border-radius:8px }
+.lobby .id { font-weight:800 }
+
+body { background: transparent }

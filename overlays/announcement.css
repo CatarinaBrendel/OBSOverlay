@@ -1,0 +1,6 @@
+.announcement.hidden { display:none }
+.announcement { position:absolute; left:50%; top:20%; transform:translateX(-50%); max-width:1400px; padding:18px; background:rgba(0,0,0,0.6); color:#fff; font-size:42px; text-align:center }
+.announcement.align-left { text-align:left }
+.announcement.align-right { text-align:right }
+
+body { background: transparent }

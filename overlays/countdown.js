@@ -1,4 +1,4 @@
-// Countdown overlay script
+// Countdown overlay script (moved)
 let countdownTimer = null;
 let remaining = 0; // seconds
 
