@@ -20,7 +20,7 @@
   let ws;
   try { ws = new WebSocket(url); } catch (e) { console.warn('Lobby WS failed', e); return; }
 
-  ws.addEventListener('open', ()=>{ console.log('Lobby overlay connected'); });
+  ws.addEventListener('open', ()=>{});
   ws.addEventListener('message', (ev)=>{
     try {
       const msg = JSON.parse(ev.data);

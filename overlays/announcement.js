@@ -45,7 +45,7 @@
     return;
   }
 
-  ws.addEventListener('open', ()=>{ console.log('Announcement overlay connected'); });
+  ws.addEventListener('open', ()=>{});
   ws.addEventListener('message', (ev)=>{
     try{
       const msg = JSON.parse(ev.data);
@@ -85,6 +85,6 @@
     }catch(e){ console.error('Invalid WS message', e); }
   });
 
-  ws.addEventListener('close', ()=>{ console.log('Announcement WS closed'); });
+  ws.addEventListener('close', ()=>{});
   ws.addEventListener('error', (e)=>{ console.warn('Announcement WS error', e); });
 })();

@@ -14,7 +14,6 @@ try {
   if (fs.existsSync(envPath)) {
     try {
       require('dotenv').config({ path: envPath });
-      console.log('Loaded .env via dotenv');
     } catch (e) {
       // fallback: simple manual parser
       const raw = fs.readFileSync(envPath, 'utf8');
@@ -25,7 +24,7 @@ try {
         if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) val = val.slice(1, -1);
         process.env[m[1]] = val;
       });
-      console.log('Loaded .env via manual parser');
+      // .env loaded via manual parser
     }
   }
 } catch (e) { console.warn('Failed to load .env', e); }
@@ -45,7 +44,7 @@ app.use((req, res, next) => {
 // Request logging for debugging control UI network issues
 app.use((req, res, next) => {
   try {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} origin=${req.headers.origin || '-'} ua=${(req.headers['user-agent']||'').slice(0,60)}`);
+    // request logging removed
   } catch (e) {}
   next();
 });
@@ -123,53 +122,11 @@ const port = process.env.PORT || 3000;
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// helper to fetch remote URL (http/https)
-const fetchUrl = (url) => new Promise((resolve, reject) => {
-  try {
-    const u = new URL(url);
-    const lib = u.protocol === 'https:' ? require('https') : require('http');
-    const opts = { headers: { 'User-Agent': 'ScoreboardBot/1.0 (+https://example)' } };
-    lib.get(u, opts, (res) => {
-      let data = '';
-      res.on('data', (chunk) => data += chunk.toString());
-      res.on('end', () => resolve({ status: res.statusCode, body: data }));
-      res.on('error', (e) => reject(e));
-    }).on('error', reject);
-  } catch (e) { reject(e); }
-});
+// helper utilities
+const { fetchUrl, extractNamesFromHtml } = require('./lib/helpers');
 
 // Extract team/player names from HTML using heuristic regexes
-function extractNamesFromHtml(html) {
-  if (!html || typeof html !== 'string') return [];
-  const names = new Set();
-
-  // 1) anchors that look like participant links or contain a short text
-  const aRe = /<a[^>]*>([^<]{2,60}?)<\/a>/gi;
-  let m;
-  while ((m = aRe.exec(html)) !== null) {
-    const t = m[1].trim();
-    if (t && /[A-Za-z0-9]/.test(t) && t.length <= 60) names.add(t);
-  }
-
-  // 2) elements with class names containing player/participant/name
-  const clsRe = /<[^>]+class=["']([^"']*)["'][^>]*>([^<]{2,80})<\/[^>]+>/gi;
-  while ((m = clsRe.exec(html)) !== null) {
-    const classes = (m[1] || '').toLowerCase();
-    const text = (m[2] || '').trim();
-    if (/(player|participant|entrant|name)/.test(classes) && text && text.length <= 80) names.add(text);
-  }
-
-  // 3) fallback: plain text lines that look like names (one or two words, capitalized)
-  const textOnly = html.replace(/<[^>]+>/g, '\n');
-  const lines = textOnly.split(/\n+/).map(s => s.trim()).filter(Boolean);
-  for (const line of lines) {
-    if (line.length < 3 || line.length > 60) continue;
-    // simple name heuristic: contains letters and spaces, not too many punctuation marks
-    if (/^[A-Za-z0-9 \-'.]{2,60}$/.test(line) && /[A-Za-z]/.test(line)) names.add(line);
-  }
-
-  return Array.from(names).slice(0, 200);
-}
+// extractNamesFromHtml is implemented in lib/helpers.js
 
 function broadcastState() {
   const msg = JSON.stringify({ type: "state", state: scoreboardState });
@@ -206,7 +163,7 @@ app.post('/state', (req, res) => {
 // Accept countdown commands from control UI and broadcast to overlay via WebSocket
 app.post('/countdown', (req, res) => {
   const { action, duration, label } = req.body || {};
-  console.log('POST /countdown', { action, duration, label });
+  // countdown command received
 
   // validate action
   if (!action || !['start','stop','reset','label'].includes(action)) {
@@ -229,7 +186,7 @@ app.post('/countdown', (req, res) => {
       try { client.send(msg); sent++; } catch (e) { console.warn('Failed sending to client', e); }
     }
   });
-  console.log(`Broadcasted countdown (${action}) to ${sent} clients`);
+  // broadcasted countdown to clients
 
   res.json({ ok: true });
 });
@@ -321,7 +278,7 @@ app.get('/iframe/teams', async (req, res) => {
 // Accept announcements from control UI and broadcast to overlay via WebSocket
 app.post('/announce', (req, res) => {
   const { text, action } = req.body || {};
-  console.log('POST /announce', { text: typeof text === 'string' ? text.slice(0,200) : text, action, origin: req.headers.origin });
+  // announcement received
 
   let payload;
   if (action === 'clear') {
@@ -349,7 +306,7 @@ app.post('/announce', (req, res) => {
       try { client.send(msg); sent++; } catch (e) { console.warn('Failed sending announcement to client', e); }
     }
   });
-  console.log(`Broadcasted announcement to ${sent} clients`);
+  // broadcasted announcement to clients
 
   res.json({ ok: true });
 });
@@ -357,7 +314,7 @@ app.post('/announce', (req, res) => {
 // Accept lobby ID from control UI and broadcast to overlay via WebSocket
 app.post('/lobby', (req, res) => {
   const { id } = req.body || {};
-  console.log('POST /lobby', { id: typeof id === 'string' ? id.slice(0,200) : id, origin: req.headers.origin });
+  // lobby id received
 
   const payload = { type: 'lobby', id: (typeof id === 'string' ? id.trim() : '') };
   const msg = JSON.stringify(payload);
@@ -367,7 +324,7 @@ app.post('/lobby', (req, res) => {
       try { client.send(msg); sent++; } catch (e) { console.warn('Failed sending lobby to client', e); }
     }
   });
-  console.log(`Broadcasted lobby to ${sent} clients`);
+  // broadcasted lobby to clients
 
   res.json({ ok: true });
 });
@@ -385,6 +342,4 @@ app.post('/reset', (req, res) => {
   res.json({ ok: true, state: scoreboardState });
 });
 
-server.listen(port, () => {
-  console.log(`Listening on ${port}`);
-});
+server.listen(port, () => {});

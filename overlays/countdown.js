@@ -73,13 +73,10 @@ function connectWS() {
     return;
   }
 
-  console.log('Countdown overlay: connecting WS to', url);
-
   ws.addEventListener('message', (ev) => {
     try {
       const msg = JSON.parse(ev.data);
       if (!msg) return;
-      console.log('Countdown overlay: WS message', msg);
       if (msg.type === 'countdown') {
         const action = msg.action;
         const dur = typeof msg.duration === 'number' ? msg.duration : null;

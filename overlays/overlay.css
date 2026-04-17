@@ -71,13 +71,13 @@ body { position: relative; }
 .player.left::before { 
     background: var(--left-accent); 
     clip-path: polygon(0 0, calc(100% - 40px) 0, 100% 100%, 0 100%); 
-    opacity: 0.35; 
+    opacity: 0.45; 
     border-radius: 18px 10px 10px 18px;
 }
 .player.right::before { 
     background: var(--right-accent); 
     clip-path: polygon(40px 0, 100% 0, 100% 100%, 0 100%); 
-    opacity: 0.35; 
+    opacity: 0.45; 
     border-radius: 10px 18px 18px 10px;
 }
 

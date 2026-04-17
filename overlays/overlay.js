@@ -91,14 +91,14 @@ function startPolling() {
   if (pollTimer) return;
   fetchState();
   pollTimer = setInterval(fetchState, POLL_INTERVAL);
-  console.log('Overlay: polling started');
+  
 }
 
 function stopPolling() {
   if (!pollTimer) return;
   clearInterval(pollTimer);
   pollTimer = null;
-  console.log('Overlay: polling stopped');
+  
 }
 
 let ws = null;
@@ -108,7 +108,7 @@ const MAX_RECONNECT = 10000;
 function connectWS() {
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
   const url = `${protocol}://${location.host}`;
-  console.log('Overlay: connecting to', url);
+  
 
   try {
     ws = new WebSocket(url);
@@ -125,7 +125,7 @@ function connectWS() {
 
   ws.addEventListener('open', () => {
     clearTimeout(openTimeout);
-    console.log('Overlay WS connected');
+    
     stopPolling();
     reconnectDelay = 500; // reset
   });
