@@ -147,6 +147,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   try { announceApi = initAnnouncementEditor(); } catch (e) { console.warn('initAnnouncementEditor failed', e); }
   try { await initIframeControls(); } catch (e) { console.warn('initIframeControls failed', e); }
 
+  // listen for teams update events (dispatched after saving iframe config)
+  document.addEventListener('teamsUpdated', async (ev) => {
+    try { await loadTeams(); await refreshForm(); } catch (e) { console.warn('teamsUpdated handler failed', e); }
+  });
+
   // load teams for selects
   try { await loadTeams(); } catch (e) { console.warn('loadTeams failed', e); }
 

@@ -48,7 +48,24 @@ export async function initIframeControls() {
       const val = input.value || ''; const src = extractSrcFromInput(val); const s = Number(scaleEl && scaleEl.value ? scaleEl.value : 1);
       let payload = { scale: s }; if (src) payload.src = src; else payload.html = val;
       const json = await setIframeState(payload);
-      status.textContent = (json && json.ok) ? 'Saved.' : 'Error saving.';
+      if (json && json.ok) {
+        status.textContent = 'Saved.';
+        // trigger server to fetch and persist teams (writes challonge_teams.json)
+        try {
+          const t = await fetch('/iframe/teams?useApi=1');
+          const tj = await t.json().catch(()=>null);
+          if (tj && tj.ok) {
+            status.textContent = 'Saved. Teams updated.';
+            try { document.dispatchEvent(new CustomEvent('teamsUpdated', { detail: tj })); } catch (e) {}
+          }
+          else status.textContent = 'Saved. Teams update failed.';
+        } catch (e) {
+          // non-fatal
+          status.textContent = 'Saved. Teams update failed (network).';
+        }
+      } else {
+        status.textContent = 'Error saving.';
+      }
     } catch (e) { status.textContent = 'Network error.'; }
     finally { saveBtn.disabled = false; setTimeout(() => { status.textContent = ''; }, 2000); }
   });
