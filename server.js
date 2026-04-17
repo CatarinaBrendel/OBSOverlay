@@ -8,6 +8,28 @@ const app = express();
 // serve static files from repo root, but expose organized folders `control/` and `overlays/`
 app.use(express.static(__dirname));
 
+// Load environment variables from .env if present (try dotenv, fallback to simple parser)
+try {
+  const envPath = path.join(__dirname, '.env');
+  if (fs.existsSync(envPath)) {
+    try {
+      require('dotenv').config({ path: envPath });
+      console.log('Loaded .env via dotenv');
+    } catch (e) {
+      // fallback: simple manual parser
+      const raw = fs.readFileSync(envPath, 'utf8');
+      raw.split(/\r?\n/).forEach(line => {
+        const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+        if (!m) return;
+        let val = m[2] || '';
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) val = val.slice(1, -1);
+        process.env[m[1]] = val;
+      });
+      console.log('Loaded .env via manual parser');
+    }
+  }
+} catch (e) { console.warn('Failed to load .env', e); }
+
 // parse JSON bodies for POST requests
 app.use(express.json());
 
@@ -101,6 +123,54 @@ const port = process.env.PORT || 3000;
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// helper to fetch remote URL (http/https)
+const fetchUrl = (url) => new Promise((resolve, reject) => {
+  try {
+    const u = new URL(url);
+    const lib = u.protocol === 'https:' ? require('https') : require('http');
+    const opts = { headers: { 'User-Agent': 'ScoreboardBot/1.0 (+https://example)' } };
+    lib.get(u, opts, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk.toString());
+      res.on('end', () => resolve({ status: res.statusCode, body: data }));
+      res.on('error', (e) => reject(e));
+    }).on('error', reject);
+  } catch (e) { reject(e); }
+});
+
+// Extract team/player names from HTML using heuristic regexes
+function extractNamesFromHtml(html) {
+  if (!html || typeof html !== 'string') return [];
+  const names = new Set();
+
+  // 1) anchors that look like participant links or contain a short text
+  const aRe = /<a[^>]*>([^<]{2,60}?)<\/a>/gi;
+  let m;
+  while ((m = aRe.exec(html)) !== null) {
+    const t = m[1].trim();
+    if (t && /[A-Za-z0-9]/.test(t) && t.length <= 60) names.add(t);
+  }
+
+  // 2) elements with class names containing player/participant/name
+  const clsRe = /<[^>]+class=["']([^"']*)["'][^>]*>([^<]{2,80})<\/[^>]+>/gi;
+  while ((m = clsRe.exec(html)) !== null) {
+    const classes = (m[1] || '').toLowerCase();
+    const text = (m[2] || '').trim();
+    if (/(player|participant|entrant|name)/.test(classes) && text && text.length <= 80) names.add(text);
+  }
+
+  // 3) fallback: plain text lines that look like names (one or two words, capitalized)
+  const textOnly = html.replace(/<[^>]+>/g, '\n');
+  const lines = textOnly.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  for (const line of lines) {
+    if (line.length < 3 || line.length > 60) continue;
+    // simple name heuristic: contains letters and spaces, not too many punctuation marks
+    if (/^[A-Za-z0-9 \-'.]{2,60}$/.test(line) && /[A-Za-z]/.test(line)) names.add(line);
+  }
+
+  return Array.from(names).slice(0, 200);
+}
+
 function broadcastState() {
   const msg = JSON.stringify({ type: "state", state: scoreboardState });
   wss.clients.forEach((client) => {
@@ -190,6 +260,62 @@ app.post('/iframe', (req, res) => {
   });
 
   res.json({ ok: true, iframe: iframeState });
+});
+
+// Fetch and extract participant/team names from the configured iframe (challonge)
+app.get('/iframe/teams', async (req, res) => {
+  try {
+    const useApi = req.query.useApi === '1' || req.query.useApi === 'true' || req.query.useapi === '1' || req.query.useapi === 'true';
+    const apiKey = (req.query.api_key || req.query.apikey || (req.body && req.body.api_key) || process.env.CHALLONGE_API_KEY || process.env.CHALLONGE_API || process.env.CHALLONGE_KEY) || null;
+
+    // If user requested API approach, use Challonge API (requires apiKey)
+    if (useApi) {
+      if (!apiKey) return res.status(400).json({ ok: false, error: 'missing_api_key', hint: 'set CHALLONGE_API_KEY or provide api_key' });
+      if (!iframeState.src) return res.status(400).json({ ok: false, error: 'no_iframe_src' });
+
+      // extract slug from iframe URL (take segment before 'module' or last segment)
+      let slug = null;
+      try {
+        const p = new URL(iframeState.src).pathname.split('/').filter(Boolean);
+        const mi = p.indexOf('module');
+        if (mi > 0) slug = p[mi - 1];
+        else slug = p[p.length - 1] || null;
+      } catch (e) { /* fallthrough */ }
+      if (!slug) return res.status(400).json({ ok: false, error: 'could_not_parse_slug' });
+
+      const apiUrl = `https://api.challonge.com/v1/tournaments/${encodeURIComponent(slug)}/participants.json?api_key=${encodeURIComponent(apiKey)}`;
+      const fetched = await fetchUrl(apiUrl).catch(err => ({ status: 0, error: String(err) }));
+      if (!fetched || !fetched.status || fetched.status < 200 || fetched.status >= 400) return res.status(502).json({ ok: false, error: 'api_fetch_failed', status: fetched && fetched.status, info: fetched && fetched.error });
+
+      let parsed = null;
+      try { parsed = JSON.parse(fetched.body); } catch (e) { return res.status(502).json({ ok: false, error: 'invalid_api_response' }); }
+      // parsed is expected to be array of { participant: { name, display_name, ... } }
+      const names = (Array.isArray(parsed) ? parsed.map(p => (p && p.participant && (p.participant.display_name || p.participant.name)) || null).filter(Boolean) : []);
+      const out = { source: iframeState.src, method: 'api', slug, count: names.length, names, raw: parsed, ts: new Date().toISOString() };
+      try { fs.writeFileSync(path.join(__dirname, 'challonge_teams.json'), JSON.stringify(out, null, 2)); } catch (e) { console.warn('write teams file failed', e); }
+      return res.json({ ok: true, teams: out });
+    }
+
+    // fallback: fetch raw HTML and heuristically extract names
+    let html = null;
+    if (iframeState.html) {
+      html = iframeState.html;
+    } else if (iframeState.src) {
+      const fetched = await fetchUrl(iframeState.src);
+      if (fetched && fetched.status && fetched.status >= 200 && fetched.status < 400) html = fetched.body;
+      else return res.status(502).json({ ok: false, error: 'failed_fetch', status: fetched && fetched.status });
+    } else {
+      return res.status(400).json({ ok: false, error: 'no_iframe_configured' });
+    }
+
+    const names = extractNamesFromHtml(html);
+    const out = { source: iframeState.src || null, method: 'html', count: names.length, names, ts: new Date().toISOString() };
+    try { fs.writeFileSync(path.join(__dirname, 'challonge_teams.json'), JSON.stringify(out, null, 2)); } catch (e) { console.warn('write teams file failed', e); }
+    return res.json({ ok: true, teams: out });
+  } catch (e) {
+    console.error('Error extracting teams', e);
+    return res.status(500).json({ ok: false, error: 'server_error' });
+  }
 });
 
 // Accept announcements from control UI and broadcast to overlay via WebSocket

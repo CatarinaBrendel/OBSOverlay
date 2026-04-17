@@ -1,4 +1,4 @@
-import { getState, resetAll as resetAllState } from './components/state.js';
+import { getState, setState, resetAll as resetAllState } from './components/state.js';
 import { initScoreboard } from './components/scoreboard.js';
 import { initCountdownControls } from './components/countdownControls.js';
 import { initLobbyControls } from './components/lobbyControls.js';
@@ -78,6 +78,63 @@ async function refreshForm() {
   } catch (e) { console.warn('refreshForm failed', e); }
 }
 
+async function loadTeams() {
+  try {
+    let res = await fetch('/iframe/teams?useApi=1');
+    let j = await res.json().catch(()=>null);
+    if (!j || !j.ok) {
+      res = await fetch('/iframe/teams');
+      j = await res.json().catch(()=>null);
+    }
+    const names = (j && j.ok && j.teams && Array.isArray(j.teams.names)) ? j.teams.names : [];
+    const leftSel = document.getElementById('leftTeamSelect');
+    const rightSel = document.getElementById('rightTeamSelect');
+    if (!leftSel || !rightSel) return;
+    if (!names.length) { leftSel.style.display = 'none'; rightSel.style.display = 'none'; return; }
+    leftSel.style.display = '';
+    rightSel.style.display = '';
+    // populate
+    leftSel.innerHTML = '<option value="">Select team...</option>' + names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+    rightSel.innerHTML = '<option value="">Select team...</option>' + names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+
+    // try to set current selection based on server state
+    try {
+      const st = await getState();
+      if (st && st.leftName && names.includes(st.leftName)) leftSel.value = st.leftName;
+      if (st && st.rightName && names.includes(st.rightName)) rightSel.value = st.rightName;
+    } catch (e) { /* ignore */ }
+
+    // keep selects in sync when user types into the text inputs
+    const leftInput = document.getElementById('leftName');
+    const rightInput = document.getElementById('rightName');
+    if (leftInput) {
+      leftInput.addEventListener('input', (e) => {
+        const v = String(e.target.value || '');
+        if (names.includes(v)) leftSel.value = v; else leftSel.value = '';
+      });
+    }
+    if (rightInput) {
+      rightInput.addEventListener('input', (e) => {
+        const v = String(e.target.value || '');
+        if (names.includes(v)) rightSel.value = v; else rightSel.value = '';
+      });
+    }
+
+    leftSel.addEventListener('change', async (e) => {
+      const v = e.target.value; if (!v) return;
+      const leftNameInput = document.getElementById('leftName'); if (leftNameInput) leftNameInput.value = v;
+      try { await setState({ leftName: v }); } catch (e) {}
+    });
+    rightSel.addEventListener('change', async (e) => {
+      const v = e.target.value; if (!v) return;
+      const rightNameInput = document.getElementById('rightName'); if (rightNameInput) rightNameInput.value = v;
+      try { await setState({ rightName: v }); } catch (e) {}
+    });
+  } catch (e) { console.warn('loadTeams failed', e); }
+}
+
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 document.addEventListener('DOMContentLoaded', async () => {
   addButtonPressEffects();
   attachHotkeys();
@@ -89,6 +146,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   let announceApi = null;
   try { announceApi = initAnnouncementEditor(); } catch (e) { console.warn('initAnnouncementEditor failed', e); }
   try { await initIframeControls(); } catch (e) { console.warn('initIframeControls failed', e); }
+
+  // load teams for selects
+  try { await loadTeams(); } catch (e) { console.warn('loadTeams failed', e); }
 
   // refresh form values from server
   await refreshForm();
