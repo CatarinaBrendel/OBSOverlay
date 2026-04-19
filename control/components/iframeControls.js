@@ -28,18 +28,65 @@ export async function initIframeControls() {
   try {
     const state = await getIframeState();
     if (state) {
-      if (state.html) input.value = state.html; else if (state.src) input.value = state.src;
-      if (previewEl && state.src) previewEl.src = state.src; else if (previewEl && state.html) previewEl.srcdoc = state.html;
+      // Prefer showing a simple src URL in the input when possible.
+      if (state.html) {
+        const maybeSrc = extractSrcFromInput(state.html);
+        input.value = maybeSrc || state.html;
+      } else if (state.src) {
+        input.value = state.src;
+      }
+
+      // For preview, prefer using the extracted src when available to avoid showing raw HTML
+      if (previewEl) {
+        if (state.src) {
+          previewEl.removeAttribute('srcdoc'); previewEl.src = state.src;
+        } else if (state.html) {
+          const maybeSrc = extractSrcFromInput(state.html);
+          if (maybeSrc) { previewEl.removeAttribute('srcdoc'); previewEl.src = maybeSrc; }
+          else { previewEl.src = 'about:blank'; previewEl.srcdoc = state.html; }
+        }
+      }
+
       const s = (typeof state.scale === 'number') ? state.scale : (state.scale ? Number(state.scale) : null);
-      if (s && scaleEl) { scaleEl.value = s; scaleLabel.textContent = Math.round(s*100) + '%'; if (previewWrapper) previewWrapper.style.transform = 'scale(' + s + ')'; }
+      if (s && scaleEl) { scaleEl.value = s; scaleLabel.textContent = Math.round(s*100) + '%'; if (previewWrapper) setPreviewScale(s); }
+
+      // initialize preview button label based on container visibility
+      try {
+        const previewContainer = document.getElementById('iframePreviewContainer');
+        if (previewBtn) previewBtn.textContent = (previewContainer && (previewContainer.style.display === 'none')) ? 'Show Preview' : 'Hide Preview';
+      } catch (e) {}
     }
   } catch (e) {}
 
   if (previewBtn) previewBtn.addEventListener('click', () => {
+    const previewContainer = document.getElementById('iframePreviewContainer');
     const val = input.value || '';
     const src = extractSrcFromInput(val);
+
+    // Toggle visibility
+    if (previewContainer) {
+      const isHidden = previewContainer.style.display === 'none';
+      if (!isHidden) {
+        previewContainer.style.display = 'none';
+        previewBtn.textContent = 'Show Preview';
+        return;
+      } else {
+        previewContainer.style.display = '';
+        previewBtn.textContent = 'Hide Preview';
+      }
+    }
+
+    // Set preview content and scale
     if (src) { previewEl.removeAttribute('srcdoc'); previewEl.src = src; } else { previewEl.src = 'about:blank'; previewEl.srcdoc = val; }
-    try { const s = Number(scaleEl.value || 1); if (previewWrapper) previewWrapper.style.transform = 'scale(' + s + ')'; } catch (e) {}
+    try { const s = Number(scaleEl.value || 1); if (previewWrapper) setPreviewScale(s); } catch (e) {}
+
+    // Broadcast preview to overlays (do not persist) so the display page shows the same preview.
+    try {
+      const s = Number(scaleEl.value || 1);
+      const payload = { scale: s };
+      if (src) payload.src = src; else payload.html = val;
+      fetch('/iframe?preview=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(()=>{});
+    } catch (e) {}
   });
 
   if (saveBtn) saveBtn.addEventListener('click', async () => {
@@ -70,7 +117,27 @@ export async function initIframeControls() {
     finally { saveBtn.disabled = false; setTimeout(() => { status.textContent = ''; }, 2000); }
   });
 
-  function setPreviewScale(v) { try { const s = Number(v || 1); if (previewWrapper) previewWrapper.style.transform = 'scale(' + s + ')'; if (scaleLabel) scaleLabel.textContent = Math.round(s*100) + '%'; } catch (e) {} }
+  function setPreviewScale(v) {
+    try {
+      const s = Number(v || 1);
+      if (!previewWrapper) return;
+      // When scaling down/up, increase the wrapper's width so the scaled iframe fits
+      // This prevents clipping inside the overflow:hidden container.
+      // The iframe stays 100% width of the wrapper and is scaled via transform.
+      const wrapperEl = previewWrapper;
+      const iframeEl = previewEl;
+      // set transform origin to top center for nicer centering
+      wrapperEl.style.transformOrigin = 'top center';
+      // set wrapper width to compensate scaling (100% / scale)
+      wrapperEl.style.width = (100 / s) + '%';
+      // set wrapper height so visual preview height remains constant
+      const nativeHeight = iframeEl && iframeEl.offsetHeight ? iframeEl.offsetHeight : 220;
+      wrapperEl.style.height = (nativeHeight / s) + 'px';
+      // apply scale on the wrapper
+      wrapperEl.style.transform = 'scale(' + s + ')';
+      if (scaleLabel) scaleLabel.textContent = Math.round(s * 100) + '%';
+    } catch (e) {}
+  }
   if (scaleEl) {
     const debouncedSendScale = debounce(async (v) => { try { await setIframeState({ scale: Number(v) }); } catch (e) {} }, 200);
     scaleEl.addEventListener('input', (e) => { const v = e.target.value; setPreviewScale(v); debouncedSendScale(v); });

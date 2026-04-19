@@ -1,142 +1,17 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Challonge Module</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Challonge — 2XKOvsSFEAM2</title>
   <style>
-    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f7f7f7}
-    .header{height:56px;display:flex;align-items:center;padding:0 16px;background:#0b1220;color:#fff;font-weight:600}
-    .container{height:calc(100vh - 56px)}
-    iframe{border:0;width:100%;height:100%;display:block}
-    .note{padding:10px 16px;color:#444;background:#fff;border-bottom:1px solid #e6e6e6}
-    a{color:#1a73e8}
+    html, body { height: 100%; margin: 0; }
+    .frame { width: 100%; height: 100vh; border: 0; display: block; }
+    .open-link { position: fixed; right: 12px; top: 12px; z-index: 999; }
   </style>
 </head>
 <body>
-  <div class="header">Challonge Module</div>
-  <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#fff;">
-    <div style="font-size:13px;color:#222;font-weight:600">Zoom</div>
-    <button id="zoomOut" style="padding:6px 8px">-</button>
-    <input id="zoomRange" type="range" min="0.5" max="2" step="0.05" value="1" style="width:240px" />
-    <button id="zoomIn" style="padding:6px 8px">+</button>
-    <button id="zoomReset" style="margin-left:8px;padding:6px 8px" class="secondary">Reset</button>
-    <div id="zoomLabel" style="margin-left:8px;color:#444;font-size:13px">100%</div>
-  </div>
-  <div class="note">Embedded view of the Challonge module. If embedding is blocked, open it directly: <a href="https://challonge.com/de/2XKOvsSFAPAC2/module" target="_blank" rel="noopener">Open Challonge module</a></div>
-  <div class="container">
-    <div id="zoomWrapper" style="--scale:1;overflow:hidden;height:100%;width:100%;display:block;">
-      <iframe id="challongeFrame" scrolling="auto" allowtransparency="true" style="transform-origin:0 0;transform:scale(var(--scale));width:calc(100% / var(--scale));height:calc(100% / var(--scale));border:0;display:block"></iframe>
-    </div>
-  </div>
-
-  <script>
-    async function loadIframe() {
-      try {
-        const res = await fetch('/iframe', { cache: 'no-store' });
-        if (!res.ok) return;
-        const data = await res.json();
-        const frame = document.getElementById('challongeFrame');
-        if (!frame) return;
-        if (data.html) {
-          frame.removeAttribute('src');
-          frame.srcdoc = data.html;
-        } else if (data.src) {
-          frame.removeAttribute('srcdoc');
-          frame.src = data.src;
-        }
-        try {
-          if (typeof data.scale !== 'undefined' && data.scale !== null) {
-            const s = Number(data.scale) || 1;
-            const wrapper = document.getElementById('zoomWrapper');
-            if (wrapper) {
-              wrapper.style.setProperty('--scale', s);
-              const range = document.getElementById('zoomRange');
-              const label = document.getElementById('zoomLabel');
-              if (range) range.value = s;
-              if (label) label.textContent = Math.round(s * 100) + '%';
-              try { localStorage.setItem('challonge.scale', String(s)); } catch (e) {}
-            }
-          }
-        } catch (e) {}
-      } catch (e) { console.warn('Failed to load iframe state', e); }
-    }
-
-    function setupWs() {
-      try {
-        const proto = (location.protocol === 'https:') ? 'wss:' : 'ws:';
-        const wsUrl = proto + '//' + location.host;
-        const ws = new WebSocket(wsUrl);
-        ws.addEventListener('message', (ev) => {
-          try {
-            const msg = JSON.parse(ev.data);
-            if (msg && msg.type === 'iframe' && msg.iframe) {
-              const frame = document.getElementById('challongeFrame');
-              if (!frame) return;
-              if (msg.iframe.html) {
-                frame.removeAttribute('src');
-                frame.srcdoc = msg.iframe.html;
-              } else if (msg.iframe.src) {
-                frame.removeAttribute('srcdoc');
-                frame.src = msg.iframe.src;
-              }
-              try {
-                if (typeof msg.iframe.scale !== 'undefined' && msg.iframe.scale !== null) {
-                  const s = Number(msg.iframe.scale) || 1;
-                  const wrapper = document.getElementById('zoomWrapper');
-                  if (wrapper) {
-                    wrapper.style.setProperty('--scale', s);
-                    const range = document.getElementById('zoomRange');
-                    const label = document.getElementById('zoomLabel');
-                    if (range) range.value = s;
-                    if (label) label.textContent = Math.round(s * 100) + '%';
-                    try { localStorage.setItem('challonge.scale', String(s)); } catch (e) {}
-                  }
-                }
-              } catch (e) {}
-            }
-          } catch (e) {}
-        });
-      } catch (e) {}
-    }
-
-    loadIframe();
-    setupWs();
-
-    const range = document.getElementById('zoomRange');
-    const label = document.getElementById('zoomLabel');
-    const wrapper = document.getElementById('zoomWrapper');
-    const zoomIn = document.getElementById('zoomIn');
-    const zoomOut = document.getElementById('zoomOut');
-    const zoomReset = document.getElementById('zoomReset');
-
-    function setScale(s) {
-      s = Number(s) || 1;
-      if (s <= 0) s = 1;
-      wrapper.style.setProperty('--scale', s);
-      range.value = s;
-      label.textContent = Math.round(s * 100) + '%';
-      try { localStorage.setItem('challonge.scale', String(s)); } catch (e) {}
-    }
-
-    (function() {
-      let initial = 1;
-      try {
-        const params = new URLSearchParams(location.search);
-        const q = params.get('scale');
-        if (q) initial = Number(q) || initial;
-        else {
-          const saved = localStorage.getItem('challonge.scale');
-          if (saved) initial = Number(saved) || initial;
-        }
-      } catch (e) {}
-      setScale(initial);
-    })();
-
-    if (range) range.addEventListener('input', (e) => setScale(e.target.value));
-    if (zoomIn) zoomIn.addEventListener('click', () => setScale(Math.min(2, Number(range.value) + 0.05)));
-    if (zoomOut) zoomOut.addEventListener('click', () => setScale(Math.max(0.5, Number(range.value) - 0.05)));
-    if (zoomReset) zoomReset.addEventListener('click', () => setScale(1));
-  </script>
+  <a class="open-link" href="https://challonge.com/de/2XKOvsSFEAM2/module" target="_blank" rel="noopener">Open in new tab</a>
+  <iframe class="frame" src="https://challonge.com/de/2XKOvsSFEAM2/module" title="Challonge bracket" allowfullscreen sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
 </body>
 </html>
