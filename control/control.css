@@ -7,6 +7,10 @@
       --accent: #7c3aed;
       --danger: #dc2626;
       --border: rgba(255,255,255,0.08);
+
+      /* new */
+      --ui-scale: 0.5;
+      --base-width: 900px;
     }
 
     * {
